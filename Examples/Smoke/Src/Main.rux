@@ -1,0 +1,42 @@
+import Linux::{
+    IsError,
+    Mmap,
+    Munmap,
+    Read,
+    GetPid,
+    Stdin,
+    Stdout,
+    Write,
+    MAP_ANONYMOUS,
+    MAP_PRIVATE,
+    PROT_READ,
+    PROT_WRITE
+};
+
+func Main() -> int32 {
+    var buf: char8[64];
+
+    let count = Read(Stdin, buf.data, 64u);
+    if count <= 0i64 {
+        return 1i32;
+    }
+
+    if GetPid() <= 0i64 {
+        return 2i32;
+    }
+
+    let mapping = Mmap(null, 4096u, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1i32, 0u64);
+    if IsError(mapping) {
+        return 3i32;
+    }
+
+    if IsError(Munmap(mapping as *opaque, 4096u)) {
+        return 4i32;
+    }
+
+    if Write(Stdout, buf.data, count as uint) != count {
+        return 5i32;
+    }
+
+    return 0i32;
+}

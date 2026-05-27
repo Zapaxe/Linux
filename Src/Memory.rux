@@ -1,9 +1,0 @@
-/*
-    Linux API
-    Copyright © 2026 Rux Contributors
-    Licensed under the MIT License
-*/
-
-module Linux {
-    // Memory management functions and types
-}

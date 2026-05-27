@@ -1,0 +1,7 @@
+[Package]
+Name = "LinuxSmoke"
+Version = "0.1.0"
+Type = "bin"
+
+[Dependencies]
+Linux = { Path = "../.." }
