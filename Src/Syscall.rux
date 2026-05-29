@@ -21,12 +21,12 @@ module Linux {
     const SYS_EXIT: uint64 = 60u64;
 
     // mmap protection and mapping flags used by Mmap.
-    const PROT_READ: int32 = 0x1i32;
-    const PROT_WRITE: int32 = 0x2i32;
-    const PROT_EXEC: int32 = 0x4i32;
+    const PROT_READ: int32 = 1i32;
+    const PROT_WRITE: int32 = 2i32;
+    const PROT_EXEC: int32 = 4i32;
 
-    const MAP_PRIVATE: int32 = 0x02i32;
-    const MAP_ANONYMOUS: int32 = 0x20i32;
+    const MAP_PRIVATE: int32 = 2i32;
+    const MAP_ANONYMOUS: int32 = 32i32;
 
     @[Import(lib: "rux-linux")]
     extern {
