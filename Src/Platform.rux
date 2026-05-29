@@ -1,0 +1,187 @@
+/*
+    Linux API
+    Copyright © 2026 Rux Contributors
+    Licensed under the MIT License
+*/
+
+module Platform {
+    import Linux::{
+        IsError,
+        Mmap,
+        Munmap,
+        Read,
+        Syscall1,
+        Stdin,
+        Stdout,
+        Write,
+        MAP_ANONYMOUS,
+        MAP_PRIVATE,
+        PROT_READ,
+        PROT_WRITE,
+        SYS_EXIT
+    };
+
+    const HeaderSize: uint = 8;
+
+    // Std-facing process termination.
+    func Exit(code: uint32) {
+        Syscall1(SYS_EXIT, code as uint64);
+    }
+
+    // mmap does not know the allocation size at munmap time, so the size is
+    // stored in a small header immediately before the pointer returned to Std.
+    func Alloc(size: uint) -> *opaque {
+        let total = size + HeaderSize;
+        let mapping = Mmap(null, total, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1i32, 0u64);
+        if IsError(mapping) {
+            return null;
+        }
+        let header = mapping as *uint;
+        *header = size;
+        return (header + 1) as *opaque;
+    }
+
+    func Free(ptr: *opaque) {
+        if ptr == null {
+            return;
+        }
+        let header = (ptr as *uint) - 1;
+        Munmap(header as *opaque, *header + HeaderSize);
+    }
+
+    func Realloc(ptr: *opaque, size: uint) -> *opaque {
+        if ptr == null {
+            return Alloc(size);
+        }
+        if size == 0 {
+            Free(ptr);
+            return null;
+        }
+
+        let header = (ptr as *uint) - 1;
+        let oldSize = *header;
+        let newPtr = Alloc(size);
+        if newPtr == null {
+            return null;
+        }
+
+        let copySize = oldSize < size ? oldSize : size;
+        Copy(newPtr, ptr, copySize);
+        Free(ptr);
+        return newPtr;
+    }
+
+    func Copy(dest: *opaque, src: *const opaque, length: uint) {
+        let d = dest as *char8;
+        let s = src as *char8;
+        var i: uint = 0;
+        while i < length {
+            let value = *(s + i);
+            *(d + i) = value;
+            i++;
+        }
+    }
+
+    func Fill(ptr: *opaque, size: uint, value: int32) {
+        let p = ptr as *char8;
+        var i: uint = 0;
+        while i < size {
+            *(p + i) = value as char8;
+            i++;
+        }
+    }
+
+    func Zero(ptr: *opaque, size: uint) {
+        Fill(ptr, size, 0);
+    }
+
+    func Compare(lhs: *const opaque, rhs: *const opaque, length: uint) -> uint {
+        let l = lhs as *const char8;
+        let r = rhs as *const char8;
+        var i: uint = 0;
+        while i < length {
+            if *(l + i) != *(r + i) {
+                return i;
+            }
+            i++;
+        }
+        return length;
+    }
+
+    func ReadStdin(buffer: *opaque, count: uint, bytesRead: *uint32) -> bool32 {
+        let result = Read(Stdin, buffer, count);
+        if IsError(result) {
+            *bytesRead = 0u32;
+            return 0 as bool32;
+        }
+        *bytesRead = result as uint32;
+        return 1 as bool32;
+    }
+
+    // Std passes byte buffers for UTF-8 output on Unix-like targets.
+    func WriteStdout(buffer: *const opaque, count: uint) -> bool32 {
+        let result = Write(Stdout, buffer, count);
+        return result == count as int64 ? 1 as bool32 : 0 as bool32;
+    }
+
+    // The Linux console path is byte-oriented. For now char16 output is
+    // narrowed per code unit, which preserves the ASCII subset used by Std.
+    func WriteStdoutWide(buffer: *const char16, count: uint) -> bool32 {
+        var byte: char8[1];
+        var i: uint = 0;
+        while i < count {
+            byte[0] = (*(buffer + i)) as char8;
+            if WriteStdout(byte.data, 1u) == 0 {
+                return 0 as bool32;
+            }
+            i++;
+        }
+        return 1 as bool32;
+    }
+
+    // Public contract symbols imported by Std. The Platform prefix avoids
+    // collisions with Std::Memory and Std::Io names.
+    func PlatformExit(code: uint32) {
+        Exit(code);
+    }
+
+    func PlatformAlloc(size: uint) -> *opaque {
+        return Alloc(size);
+    }
+
+    func PlatformRealloc(ptr: *opaque, size: uint) -> *opaque {
+        return Realloc(ptr, size);
+    }
+
+    func PlatformFree(ptr: *opaque) {
+        Free(ptr);
+    }
+
+    func PlatformCopy(dest: *opaque, src: *const opaque, length: uint) {
+        Copy(dest, src, length);
+    }
+
+    func PlatformFill(ptr: *opaque, size: uint, value: int32) {
+        Fill(ptr, size, value);
+    }
+
+    func PlatformZero(ptr: *opaque, size: uint) {
+        Zero(ptr, size);
+    }
+
+    func PlatformCompare(lhs: *const opaque, rhs: *const opaque, length: uint) -> uint {
+        return Compare(lhs, rhs, length);
+    }
+
+    func PlatformReadStdin(buffer: *opaque, count: uint, bytesRead: *uint32) -> bool32 {
+        return ReadStdin(buffer, count, bytesRead);
+    }
+
+    func PlatformWriteStdout(buffer: *const opaque, count: uint) -> bool32 {
+        return WriteStdout(buffer, count);
+    }
+
+    func PlatformWriteStdoutWide(buffer: *const char16, count: uint) -> bool32 {
+        return WriteStdoutWide(buffer, count);
+    }
+}
