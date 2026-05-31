@@ -18,7 +18,10 @@ module Linux {
     const SYS_MUNMAP: uint64 = 11u64;
     const SYS_BRK: uint64 = 12u64;
     const SYS_GETPID: uint64 = 39u64;
+    const SYS_NANOSLEEP: uint64 = 35u64;
     const SYS_EXIT: uint64 = 60u64;
+    const SYS_TIME: uint64 = 201u64;
+    const SYS_CLOCK_GETTIME: uint64 = 228u64;
 
     // mmap protection and mapping flags used by Mmap.
     const PROT_READ: int32 = 1i32;
@@ -110,5 +113,24 @@ module Linux {
 
     func Errno(result: int64) -> int64 {
         return IsError(result) ? -result : 0i64;
+    }
+
+    struct timespec {
+        tv_sec: int64;
+        tv_nsec: int64;
+    }
+
+    @[Import(lib: "rux-linux")]
+    extern {
+        func __rux_linux_nanosleep(req: *timespec, rem: *timespec) -> int64;
+        func __rux_linux_clock_gettime(clk_id: int32, tp: *timespec) -> int64;
+    }
+
+    func Nanosleep(req: *timespec, rem: *timespec) -> int64 {
+        return __rux_linux_nanosleep(req, rem);
+    }
+
+    func ClockGettime(clk_id: int32, tp: *timespec) -> int64 {
+        return __rux_linux_clock_gettime(clk_id, tp);
     }
 }
